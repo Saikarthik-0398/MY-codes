@@ -1,0 +1,67 @@
+from flask import Flask, render_template, redirect, request
+import math
+app = Flask(__name__)
+
+
+def age_survival(age):
+    survival=16*(math.exp(-1*0.02*age))
+    return survival
+
+
+def feature1(baseline1,cancer_type,duration,dose_intensity,side_effects,level):
+    m=(0.*cancer_type)+(-0.1*duration)+(-0.3*dose_intensity)+(0.15*side_effects)+(0.4*level)
+    survival=baseline1*(math.exp(-1*m))
+    return survival
+
+def newsymptoms(baseline3,symptoms,week):
+    m = (symptoms*0.02)+(week*0.15)
+    survival = baseline3 * math.exp(-1*m)
+    return survival
+
+def smoke_alc(baseline,smoke,alcohol):
+    m = (smoke*0.05+alcohol*0.05)
+    survival = baseline*math.exp(-1*m)
+    return survival
+
+
+@app.route("/")
+def home():
+    return render_template("survivalhome.html")
+
+@app.route("/survival-prediction")
+def fun():
+    return render_template("surpage1.html")
+
+@app.route("/step2",methods=["POST","GET"])
+def fun1():
+    if(request.method=="POST"):
+        age = int(request.form["age"])
+        cancerType = int(request.form["cancerType"])
+        treatmentDuration = int(request.form["treatmentDuration"])
+        dosage = int(request.form["dosage"])
+        sideEffects = int(request.form["sideEffects"])
+        newSymptoms = int(request.form["newSymptoms"])
+        smoking = int(request.form["smoking"])
+        level = int(request.form["cancerlevel"])
+        drinking = int(request.form["drinking"])
+        week = int(request.form["week"])
+        b1 = age_survival(age)
+        b2 = feature1(b1,cancerType,treatmentDuration,dosage,sideEffects,level)
+        b3 = newsymptoms(b2,newSymptoms,week)
+        b4 = smoke_alc(b3,smoking,drinking)
+        return render_template("result.html", 
+                       survival_time=round(b4, 2), 
+                       age=age, 
+                       cancer_type=cancerType, 
+                       treatment_duration=treatmentDuration, 
+                       dosage=dosage, 
+                       side_effects=sideEffects, 
+                       new_symptoms=newSymptoms, 
+                       week=week, 
+                       smoking=smoking,
+                       level=level, 
+                       drinking=drinking)
+
+    return render_template("surpage1.html")
+
+app.run(port=6556,debug=True)
