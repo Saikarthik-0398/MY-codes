@@ -1,0 +1,218 @@
+from flask import Flask, render_template, redirect, request
+import joblib
+import numpy as np
+from sklearn.inspection import permutation_importance
+import matplotlib.pyplot as plt
+import io
+import base64
+import pandas as pd
+import plotly.graph_objs as go
+import plotly.offline as pyo
+import plotly.express as px
+
+app = Flask(__name__)
+dict={"Low":0,"Medium":0,"High":0}
+user_data = {"level1": {}, "level2": {}, "level3": {}, "final": {}}
+
+model = joblib.load('cancer_risk_prediction_model.pkl')
+scaler = joblib.load('scaler.pkl')
+label_encoders = joblib.load('label_encoders.pkl')
+
+model1 = joblib.load('newcancer_risk_prediction_model_level2.pkl')
+scaler1 = joblib.load('newscaler_level2.pkl')
+
+model2 = joblib.load('cancer_risk_model_level3.pkl')
+scaler2 = joblib.load('cancer_risk_scaler_level3.pkl')
+label_encoders2 = joblib.load('label_encoders_level3.pkl')
+
+model3 = joblib.load('cancer_risk_prediction_model_final.pkl')
+scaler3 = joblib.load('scaler_final.pkl')
+label_encoders3 = joblib.load('label_encoders_final.pkl')
+
+@app.route("/")
+def home():
+    global dict,user_data
+    dict={"Low":0,"Medium":0,"High":0}
+    user_data = {"level1": {}, "level2": {}, "level3": {}, "final": {}}
+    return render_template("home.html")
+@app.route("/level1", methods=["POST", "GET"])
+def fun1():
+    if request.method == 'POST':
+        try:
+            # Extract form inputs
+            age = int(request.form["age"])
+            gender = label_encoders['Gender'].transform([request.form["gender"]])[0]
+            family_history = label_encoders['Family_History_Cancer'].transform([request.form["family_history"]])[0]
+            smoking = label_encoders['Smoking_History'].transform([request.form["smoking"]])[0]
+            alcohol = label_encoders['Alcohol_Consumption'].transform([request.form["alcohol"]])[0]
+            activity = int(request.form["activity"])
+            diet = int(request.form["diet"])
+            weight_loss = float(request.form["weight_loss"])
+            fatigue = int(request.form["fatigue"])
+            pain = int(request.form["pain"])
+            user_data['level1'] = {
+                "Age": age, "Gender": gender, "Family History": family_history,
+                "Smoking": smoking, "Alcohol": alcohol, "Activity": activity,
+                "Diet": diet, "Weight Loss": weight_loss, "Fatigue": fatigue, "Pain": pain
+            }
+            features = np.array([[age, gender, family_history, smoking, alcohol, activity, diet, weight_loss, fatigue, pain]])
+            scaled_features = scaler.transform(features)
+
+            prediction = model.predict(scaled_features)[0]
+            cancer_risk = list(label_encoders['Cancer_Risk_Level'].classes_)[prediction]
+            if(cancer_risk=='High'):
+                dict["High"] = dict["High"]+1
+            elif(cancer_risk=='Medium'):
+                dict["Medium"] = dict["Medium"]+1
+            else:
+                dict["Low"] = dict["Low"]+1
+            print(f"Cancer Risk Level: {cancer_risk}")
+            return redirect("/level2")
+        except Exception as e:
+            return f"An error occurred: {str(e)}"
+    return render_template("level1.html")
+
+@app.route("/level2",methods=["POST","GET"])
+def fun2():
+    if request.method == 'POST':
+        history_disease = int(request.form["history_disease"])
+        past_cancer = int(request.form["past_cancer"])
+        family_history = int(request.form["family_history"])
+        cough_duration = int(request.form["cough_duration"])
+        bleeding = int(request.form["bleeding"])
+        lymph_nodes = int(request.form["lymph_nodes"])
+        infections = int(request.form["infections"])
+        radiation = int(request.form["radiation"])
+        hazard_exposure = int(request.form["hazard_exposure"])
+        inflammation = int(request.form["inflammation"])
+        immunity = int(request.form["immunity"])
+
+        data = {key: int(request.form[key]) for key in request.form}
+        user_data['level2'] = data
+        features = np.array([[history_disease, past_cancer, family_history, cough_duration, bleeding, lymph_nodes, infections, radiation, hazard_exposure, inflammation, immunity]])
+        scaled_features = scaler1.transform(features)
+        prediction = model1.predict(scaled_features)[0]
+        cancer_risk = {0: 'High', 1: 'Low', 2: 'Medium'}[prediction]
+        if(cancer_risk=='High'):
+            dict["High"] = dict["High"]+1
+        elif(cancer_risk=='Medium'):
+            dict["Medium"] = dict["Medium"]+1
+        else:
+            dict["Low"] = dict["Low"]+1
+        print(f"Cancer Risk Level: {cancer_risk}")
+        return redirect("/step3")
+    return render_template("level2.html")
+
+
+@app.route("/step3", methods=["POST", "GET"])
+def fun3():
+    if request.method == 'POST':
+        night_sweats = int(request.form["night_sweats"])
+        body_swelling = int(request.form["body_swelling"])
+        physical_activity = int(request.form["physical_activity"])
+        sleep_quality = int(request.form["sleep_quality"])
+        sleep_duration = float(request.form["sleep_duration"])
+        smoking_change = int(request.form["smoking_change"])
+        alcohol_change = int(request.form["alcohol_change"])
+        body_odor = int(request.form["body_odor"])
+        taste_sensation = int(request.form["taste_sensation"])
+        smell_sensation = int(request.form["smell_sensation"])
+        memory_problems = int(request.form["memory_problems"])
+        mood_swings = int(request.form["mood_swings"])
+        difficulty_concentrating = int(request.form["difficulty_concentrating"])
+        anxiety_stress = int(request.form["anxiety_stress"])
+        loss_interest = int(request.form["loss_interest"])
+        data = {key: int(request.form[key]) for key in request.form}
+        user_data['level3'] = data
+
+        features = np.array([[night_sweats, body_swelling, physical_activity, sleep_quality, sleep_duration, smoking_change,
+                              alcohol_change, body_odor, taste_sensation, smell_sensation, memory_problems, mood_swings,
+                              difficulty_concentrating, anxiety_stress, loss_interest]])
+
+        scaled_features = scaler2.transform(features)
+        prediction = model2.predict(scaled_features)[0]
+        cancer_risk = {0: "Low", 1: "Medium", 2: "High"}[prediction]
+        if(cancer_risk=='High'):
+            dict["High"] = dict["High"]+1
+        elif(cancer_risk=='Medium'):
+            dict["Medium"] = dict["Medium"]+1
+        else:
+            dict["Low"] = dict["Low"]+1
+        print(f"Cancer Risk Level: {cancer_risk}")
+        return redirect("/final")
+    return render_template("level3.html")
+
+@app.route("/final", methods=["POST", "GET"])
+def fun4():
+    if request.method == "POST":
+        weight_loss = int(request.form["weight_loss"])
+        fatigue = int(request.form["fatigue"])
+        bleeding = int(request.form["bleeding"])
+        lumps = int(request.form["lumps"])
+        cough = int(request.form["cough"])
+        breathlessness = int(request.form["breathlessness"])
+        pain = int(request.form["pain"])
+        skin_changes = int(request.form["skin_changes"])
+
+        data = {key: int(request.form[key]) for key in request.form}
+        user_data['final'] = data
+
+        features = np.array([[weight_loss, fatigue, bleeding, lumps, cough, breathlessness, pain, skin_changes]])
+
+        scaled_features = scaler3.transform(features)
+        prediction = model3.predict(scaled_features)[0]
+        cancer_risk = {0: "Low", 1: "Medium", 2: "High"}[prediction]
+        if(cancer_risk=='High'):
+            dict["High"] = dict["High"]+1
+        elif(cancer_risk=='Medium'):
+            dict["Medium"] = dict["Medium"]+1
+        else:
+            dict["Low"] = dict["Low"]+1
+        print(f"Cancer Risk Level: {cancer_risk}")
+        return redirect("/club_result")
+    return render_template("final.html")
+
+    
+
+@app.route("/club_result")
+def club_result():
+    lowcount = dict["Low"]
+    highcount = dict["High"]
+    mediumc   = dict["Medium"]
+    if(highcount>lowcount and highcount>mediumc):
+        result="Overall result is High" 
+    elif(mediumc>lowcount and mediumc>highcount):
+        result= "Overall result is Low"
+    elif(lowcount>highcount and lowcount>mediumc):
+        result= "Overall result is Medium"
+    elif(lowcount==mediumc):
+        result= "Overall result is above Low"
+    elif(mediumc==highcount):
+        result= "Overall result is above medium"
+    else:
+        redult= "Cannot Determine"
+    print(user_data)
+    alldata = {}
+    level1 = user_data["level1"]
+    for key,value in level1.items():
+        if(key=='Family History' and level1[key]==0):
+            alldata["No Cancer Scenario for Family"]="Positive"
+        
+    return render_template("club_result.html", result=result, low=lowcount, medium=mediumc, high=highcount)
+@app.route("/visualization")
+def traits():
+    positive_traits = {}
+    negative_traits = {}
+    
+    for level in ["level1", "level2", "level3", "final"]:
+        for key, value in user_data[level].items():
+            if value > 5:  
+                negative_traits[key] = value
+            elif value <= 2:  
+                positive_traits[key] = value
+
+    return render_template("visualization.html", positive_traits=positive_traits, negative_traits=negative_traits)
+
+
+if __name__ == "__main__":
+    app.run(debug=True)
